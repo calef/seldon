@@ -11,15 +11,16 @@ Gem::Specification.new do |spec|
   spec.email         = ['devs@kingcounty.solutions']
   spec.license       = 'MIT'
   spec.homepage      = 'https://github.com/calef/seldon'
-  spec.required_ruby_version = '>= 3.1'
+  spec.required_ruby_version = '>= 3.4.8'
 
   spec.files = Dir.glob('lib/**/*.rb') + %w[README.md LICENSE]
   spec.require_paths = ['lib']
 
-  spec.add_dependency 'faraday', '>= 2.0'
+  spec.add_dependency 'faraday'
   spec.add_dependency 'faraday-typhoeus'
   spec.add_development_dependency 'minitest'
   spec.add_development_dependency 'rubocop'
   spec.add_development_dependency 'rubocop-minitest'
   spec.add_development_dependency 'rake'
+  spec.add_development_dependency 'simplecov'
 end
