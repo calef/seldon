@@ -1,5 +1,14 @@
 # frozen_string_literal: true
 
+begin
+  require 'simplecov'
+  SimpleCov.start do
+    add_filter '/test/'
+  end
+rescue LoadError
+  warn 'SimpleCov not installed; coverage will not be generated' if $VERBOSE
+end
+
 require 'bundler/setup'
 require 'minitest/autorun'
 require 'seldon'
