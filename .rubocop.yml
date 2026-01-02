@@ -1,0 +1,32 @@
+plugins:
+  - rubocop-minitest
+
+AllCops:
+  Include:
+    - 'bin/**/*.rb'
+    - 'lib/**/*.rb'
+    - 'script/**/*.rb'
+    - 'Rakefile'
+  NewCops: enable
+  SuggestExtensions: false
+Layout/LineLength:
+    Max: 160
+Metrics/AbcSize:
+  Enabled: false
+Metrics/BlockLength:
+  Enabled: false
+Metrics/ClassLength:
+  Enabled: false
+Metrics/CyclomaticComplexity:
+  Enabled: false
+Metrics/MethodLength:
+  Enabled: false
+Metrics/ModuleLength:
+  Exclude:
+    - 'bin/mayhem'
+Metrics/ParameterLists:
+  Enabled: false
+Metrics/PerceivedComplexity:
+  Enabled: false
+Style/Documentation:
+  Enabled: false
