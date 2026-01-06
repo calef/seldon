@@ -61,7 +61,9 @@ module Seldon
             {
               body: body,
               content_type: response.headers['content-type'],
-              final_url: uri.to_s
+              final_url: uri.to_s,
+              request_headers: extract_headers(response&.env&.request_headers),
+              response_headers: extract_headers(response&.headers)
             }
           ]
         end
@@ -105,6 +107,14 @@ module Seldon
           else
             { url: uri.to_s, status: status_code }
           end
+        end
+
+        def extract_headers(headers)
+          return {} unless headers.respond_to?(:to_h)
+
+          headers.to_h
+        rescue StandardError
+          {}
         end
       end
     end

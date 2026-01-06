@@ -1,5 +1,9 @@
 # Change Notes
 
+## [0.3.1] - 2026-01-06
+
+- Hardened request metadata capture to include headers and added coverage for the header extraction paths.
+
 ## [0.3.0] - 2026-01-02
 
 - Introduced targeted specs for `HttpTransport` (requests, connection building, base URL handling) and expanded the URL normalizer tests so query filtering, decoding, and tracking prefix logic are covered.
