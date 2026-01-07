@@ -2,7 +2,7 @@
 
 ## [0.3.1] - 2026-01-06
 
-- Hardened request metadata capture to include headers and added coverage for the header extraction paths.
+- Bumped Bundler to 4.0.3 and refreshed the lockfile, including the Minitest 6.0.1 update.
 
 ## [0.3.0] - 2026-01-02
 
