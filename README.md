@@ -7,7 +7,7 @@ Shared infrastructure for HTTP, URL helpers, and structured logging used by Mayh
 Add this gem to your `Gemfile` and require `seldon`:
 
 ```ruby
-gem 'seldon', path: '../seldon'
+gem 'seldon', github: 'calef/seldon'
 ```
 
 Then include the modules you need:
