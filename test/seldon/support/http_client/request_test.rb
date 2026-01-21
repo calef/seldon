@@ -74,7 +74,8 @@ module Seldon
 
         def test_apply_get_headers_sets_headers
           request = HttpClientTestHelpers::FakeRequest.new
-          @transport.send(:apply_get_headers, request, 'application/json')
+          uri = URI('https://example.com/path')
+          @transport.send(:apply_get_headers, request, 'application/json', uri)
 
           assert_equal Seldon::Support::HttpClient::UA, request.headers['User-Agent']
           assert_equal 'application/json', request.headers['Accept']
@@ -83,7 +84,8 @@ module Seldon
 
         def test_apply_head_headers_sets_user_agent
           request = HttpClientTestHelpers::FakeRequest.new
-          @transport.send(:apply_head_headers, request)
+          uri = URI('https://example.com/path')
+          @transport.send(:apply_head_headers, request, uri)
 
           assert_equal Seldon::Support::HttpClient::UA, request.headers['User-Agent']
         end
