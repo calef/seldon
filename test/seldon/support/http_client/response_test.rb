@@ -143,6 +143,20 @@ module Seldon
           end
         end
 
+        def test_follow_redirect_sets_referer_to_redirecting_url
+          response = HttpClientTestHelpers::FakeResponse.new(301, { 'location' => 'https://example.com/next' })
+          transport = Object.new
+          transport.define_singleton_method(:execute_get) { |_uri, _accept, operation: nil, referer: nil| response }
+          request_flow = build_request_flow(transport, max_redirects: 1)
+          
+          captured_params = nil
+          request_flow.stub(:perform_request, proc { |*args, **kwargs| captured_params = [args, kwargs]; :redirected }) do
+            request_flow.send(:follow_redirect, response, URI('https://example.com/start'), 'text/html', 1, origin_url: 'origin', operation: 'op')
+          end
+          
+          assert_equal 'https://example.com/start', captured_params[1][:referer]
+        end
+
         def test_follow_head_redirect_handles_too_many_requests_and_missing_location
           error_response = HttpClientTestHelpers::FakeResponse.new(429, {})
           transport = Object.new
