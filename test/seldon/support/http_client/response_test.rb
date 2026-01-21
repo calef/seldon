@@ -154,6 +154,7 @@ module Seldon
             request_flow.send(:follow_redirect, response, URI('https://example.com/start'), 'text/html', 1, origin_url: 'origin', operation: 'op')
           end
           
+          refute_nil captured_params, 'perform_request should have been called'
           assert_equal 'https://example.com/start', captured_params[1][:referer]
         end
 
