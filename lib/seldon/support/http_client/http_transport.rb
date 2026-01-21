@@ -30,9 +30,9 @@ module Seldon
           @cookie_jar = cookie_jar
         end
 
-        def execute_get(uri, accept, operation: nil, &)
+        def execute_get(uri, accept, operation: nil, referer: nil, &)
           @operation_delay_manager.apply_delay(operation, uri)
-          response = perform_with_fallbacks(:get, uri, accept, &)
+          response = perform_with_fallbacks(:get, uri, accept, referer:, &)
           store_cookies(uri, response)
           response
         end
@@ -46,11 +46,11 @@ module Seldon
 
         private
 
-        def perform_with_fallbacks(method, uri, accept, &)
+        def perform_with_fallbacks(method, uri, accept, referer: nil, &)
           HTTP_VERSIONS.each_with_index do |version, index|
-            return perform_request(method, uri, accept, verify: true, http_version: version[:option].to_sym, &)
+            return perform_request(method, uri, accept, verify: true, http_version: version[:option].to_sym, referer:, &)
           rescue Faraday::SSLError => e
-            return retry_without_verification(method, uri, accept, e, http_version: version[:option].to_sym, &)
+            return retry_without_verification(method, uri, accept, e, http_version: version[:option].to_sym, referer:, &)
           rescue Faraday::ConnectionFailed, Faraday::TimeoutError => e
             next_version = HTTP_VERSIONS[index + 1]
             if next_version
@@ -64,12 +64,12 @@ module Seldon
           end
         end
 
-        def perform_request(method, uri, accept, verify:, http_version:, &)
+        def perform_request(method, uri, accept, verify:, http_version:, referer: nil, &)
           connection = build_connection(uri, verify: verify, http_version: http_version)
           response = case method
                      when :get
                        connection.get(uri.to_s) do |request|
-                         apply_get_headers(request, accept, uri)
+                         apply_get_headers(request, accept, uri, referer:)
                        end
                      when :head
                        connection.head(uri.to_s) do |request|
@@ -108,10 +108,11 @@ module Seldon
           }
         end
 
-        def apply_get_headers(request, accept, uri)
+        def apply_get_headers(request, accept, uri, referer: nil)
           request.headers['User-Agent'] = @user_agent
           request.headers['Accept'] = accept
           request.headers['Accept-Encoding'] = 'identity'
+          request.headers['Referer'] = referer if referer
           apply_cookies(request, uri)
         end
 
@@ -133,11 +134,11 @@ module Seldon
           @cookie_jar.store_from_response(uri, response.headers)
         end
 
-        def retry_without_verification(method, uri, accept, error, http_version:, &)
+        def retry_without_verification(method, uri, accept, error, http_version:, referer: nil, &)
           return handle_terminal_ssl_error(uri, error) unless @allow_insecure_fallback
 
           logger.warn "SSL error (#{error.message}), retrying without verification for #{uri}"
-          perform_request(method, uri, accept, verify: false, http_version: http_version, &)
+          perform_request(method, uri, accept, verify: false, http_version:, referer:, &)
         end
 
         def handle_terminal_ssl_error(uri, error)

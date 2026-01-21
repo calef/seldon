@@ -17,8 +17,8 @@ module Seldon
           @max_redirects = max_redirects
         end
 
-        def fetch_with_redirects(url, accept, origin_url:, operation:)
-          perform_request(url, accept, @max_redirects, origin_url: origin_url, operation: operation)
+        def fetch_with_redirects(url, accept, origin_url:, operation:, referer: nil)
+          perform_request(url, accept, @max_redirects, origin_url:, operation:, referer:)
         end
 
         def resolve_head_redirects(uri, origin_url:, operation:)
@@ -27,12 +27,12 @@ module Seldon
 
         private
 
-        def perform_request(url, accept, remaining_redirects, origin_url:, operation:)
+        def perform_request(url, accept, remaining_redirects, origin_url:, operation:, referer: nil)
           uri = URI.parse(url)
           body = nil
           redirect = nil
           status_checked = false
-          response = @transport.execute_get(uri, accept, operation: operation) do |http_response|
+          response = @transport.execute_get(uri, accept, operation:, referer:) do |http_response|
             redirect = @response_processor.redirect?(http_response)
             unless redirect
               @response_processor.check_status?(http_response, uri, origin_url: origin_url, operation: operation)
@@ -48,8 +48,8 @@ module Seldon
               uri,
               accept,
               remaining_redirects,
-              origin_url: origin_url,
-              operation: operation
+              origin_url:,
+              operation:
             )
           end
 
@@ -75,12 +75,14 @@ module Seldon
           raise 'Redirect missing location header' unless location
 
           new_url = Seldon::Support::UrlUtils.absolutize(uri.to_s, location) || location
+          # Use the redirecting URL as the referer for the next request
           perform_request(
             new_url,
             accept,
             remaining_redirects - 1,
-            origin_url: origin_url,
-            operation: operation
+            origin_url:,
+            operation:,
+            referer: uri.to_s
           )
         end
 
