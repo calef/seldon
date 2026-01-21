@@ -134,7 +134,7 @@ module Seldon
         )
       end
 
-      def fetch(url, accept:)
+      def fetch(url, accept:, referer: nil)
         attempt = 0
         max_attempts = @max_retries + 1
         begin
@@ -143,7 +143,8 @@ module Seldon
             url,
             accept,
             origin_url: url,
-            operation: 'content_fetch'
+            operation: 'content_fetch',
+            referer:
           )
           sleep @delay
         rescue ForbiddenError => e
@@ -213,7 +214,7 @@ module Seldon
         end
       end
 
-      def response_for(url, accept: HTML_ACCEPT)
+      def response_for(url, accept: HTML_ACCEPT, referer: nil)
         attempt = 0
         max_attempts = @max_retries + 1
         begin
@@ -222,7 +223,8 @@ module Seldon
             url,
             accept,
             origin_url: url,
-            operation: 'status_check'
+            operation: 'status_check',
+            referer:
           )
           {
             status: response.status.to_i,

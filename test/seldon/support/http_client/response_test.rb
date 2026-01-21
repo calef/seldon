@@ -94,7 +94,7 @@ module Seldon
         def test_perform_request_follows_redirect
           response = HttpClientTestHelpers::FakeResponse.new(301, { 'location' => 'https://example.com/next' })
           transport = Object.new
-          transport.define_singleton_method(:execute_get) { |_uri, _accept, operation: nil| response }
+          transport.define_singleton_method(:execute_get) { |_uri, _accept, operation: nil, referer: nil| response }
           request_flow = build_request_flow(transport, max_redirects: 2)
           redirected = false
           request_flow.stub(:follow_redirect, proc { |*_| redirected = true; :redirected }) do
@@ -107,7 +107,7 @@ module Seldon
         def test_perform_request_raises_on_too_many_requests
           response = HttpClientTestHelpers::FakeResponse.new(429, {})
           transport = Object.new
-          transport.define_singleton_method(:execute_get) { |_uri, _accept, operation: nil| response }
+          transport.define_singleton_method(:execute_get) { |_uri, _accept, operation: nil, referer: nil| response }
           request_flow = build_request_flow(transport, max_redirects: 2)
           assert_raises(Seldon::Support::HttpClient::TooManyRequestsError) do
             request_flow.fetch_with_redirects('https://example.com', 'text/html', origin_url: 'https://example.com', operation: 'op')
@@ -117,7 +117,7 @@ module Seldon
         def test_follow_redirect_requires_location_and_limit
           response = HttpClientTestHelpers::FakeResponse.new(301, {})
           transport = Object.new
-          transport.define_singleton_method(:execute_get) { |_uri, _accept, operation: nil| response }
+          transport.define_singleton_method(:execute_get) { |_uri, _accept, operation: nil, referer: nil| response }
           request_flow = build_request_flow(transport, max_redirects: 1)
           assert_raises(RuntimeError) do
             request_flow.send(:follow_redirect, response, URI('https://example.com'), 'text/html', 1, origin_url: 'origin', operation: 'op')
@@ -132,7 +132,7 @@ module Seldon
         def test_follow_redirect_calls_perform_request_with_absolutized_url
           response = HttpClientTestHelpers::FakeResponse.new(301, { 'location' => '/next' })
           transport = Object.new
-          transport.define_singleton_method(:execute_get) { |_uri, _accept, operation: nil| response }
+          transport.define_singleton_method(:execute_get) { |_uri, _accept, operation: nil, referer: nil| response }
           request_flow = build_request_flow(transport, max_redirects: 1)
           Seldon::Support::UrlUtils.stub(:absolutize, 'https://example.com/absolute') do
             performed = false
@@ -141,6 +141,19 @@ module Seldon
               assert performed
             end
           end
+        end
+
+        def test_follow_redirect_sets_referer_to_redirecting_url
+          response = HttpClientTestHelpers::FakeResponse.new(301, { 'location' => 'https://example.com/next' })
+          transport = Object.new
+          transport.define_singleton_method(:execute_get) { |_uri, _accept, operation: nil, referer: nil| response }
+          request_flow = build_request_flow(transport, max_redirects: 1)
+          captured_referer = nil
+          request_flow.stub(:perform_request, proc { |_url, _accept, _remaining_redirects, **kwargs| captured_referer = kwargs[:referer]; :redirected }) do
+            request_flow.send(:follow_redirect, response, URI('https://example.com/start'), 'text/html', 1, origin_url: 'origin', operation: 'op')
+          end
+          refute_nil captured_referer, 'perform_request should have been called with referer'
+          assert_equal 'https://example.com/start', captured_referer
         end
 
         def test_follow_head_redirect_handles_too_many_requests_and_missing_location
@@ -172,7 +185,7 @@ module Seldon
         def test_perform_request_redirects_when_response_is_redirection
           response = HttpClientTestHelpers::FakeResponse.new(301, { 'location' => 'https://example.com/next' })
           transport = Object.new
-          transport.define_singleton_method(:execute_get) { |_uri, _accept, operation: nil| response }
+          transport.define_singleton_method(:execute_get) { |_uri, _accept, operation: nil, referer: nil| response }
           request_flow = build_request_flow(transport, max_redirects: 2)
           redirected = false
           request_flow.stub(:follow_redirect, proc { redirected = true; :sent }) do

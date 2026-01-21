@@ -1,5 +1,10 @@
 # Change Notes
 
+## [0.5.0] - 2026-01-21
+
+- Added optional `referer:` parameter to `HttpClient#fetch` and `#response_for` for setting the HTTP Referer header on requests.
+- Referer is automatically updated to the redirecting URL when following redirects.
+
 ## [0.4.0] - 2026-01-21
 
 - Added `CookieJar` class for managing HTTP cookies per RFC 6265, with support for domain/path matching, Secure/HttpOnly attributes, and expiration handling.

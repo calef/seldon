@@ -80,6 +80,15 @@ module Seldon
           assert_equal Seldon::Support::HttpClient::UA, request.headers['User-Agent']
           assert_equal 'application/json', request.headers['Accept']
           assert_equal 'identity', request.headers['Accept-Encoding']
+          assert_nil request.headers['Referer']
+        end
+
+        def test_apply_get_headers_sets_referer_when_provided
+          request = HttpClientTestHelpers::FakeRequest.new
+          uri = URI('https://example.com/path')
+          @transport.send(:apply_get_headers, request, 'application/json', uri, referer: 'https://example.com/page')
+
+          assert_equal 'https://example.com/page', request.headers['Referer']
         end
 
         def test_apply_head_headers_sets_user_agent
