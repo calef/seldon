@@ -21,13 +21,15 @@ module Seldon
                        open_timeout: HttpClient::DEFAULTS[:timeout],
                        read_timeout: HttpClient::DEFAULTS[:timeout],
                        allow_insecure_fallback: HttpClient::DEFAULTS[:allow_insecure_fallback],
-                       cookie_jar: nil)
+                       cookie_jar: nil,
+                       from_email: nil)
           @user_agent = user_agent
           @open_timeout = open_timeout
           @read_timeout = read_timeout
           @allow_insecure_fallback = allow_insecure_fallback
           @operation_delay_manager = operation_delay_manager
           @cookie_jar = cookie_jar
+          @from_email = from_email
         end
 
         def execute_get(uri, accept, operation: nil, referer: nil, &)
@@ -113,11 +115,13 @@ module Seldon
           request.headers['Accept'] = accept
           request.headers['Accept-Encoding'] = 'identity'
           request.headers['Referer'] = referer if referer
+          request.headers['From'] = @from_email if @from_email
           apply_cookies(request, uri)
         end
 
         def apply_head_headers(request, uri)
           request.headers['User-Agent'] = @user_agent
+          request.headers['From'] = @from_email if @from_email
           apply_cookies(request, uri)
         end
 

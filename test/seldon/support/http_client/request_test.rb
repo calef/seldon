@@ -98,6 +98,38 @@ module Seldon
 
           assert_equal Seldon::Support::HttpClient::UA, request.headers['User-Agent']
         end
+
+        def test_apply_get_headers_sets_from_when_configured
+          transport_with_from = Seldon::Support::HttpClient::HttpTransport.new(
+            operation_delay_manager: FakeDelayManager.new,
+            from_email: 'bot@example.com'
+          )
+          request = HttpClientTestHelpers::FakeRequest.new
+          uri = URI('https://example.com/path')
+          transport_with_from.send(:apply_get_headers, request, 'application/json', uri)
+
+          assert_equal 'bot@example.com', request.headers['From']
+        end
+
+        def test_apply_get_headers_does_not_set_from_when_not_configured
+          request = HttpClientTestHelpers::FakeRequest.new
+          uri = URI('https://example.com/path')
+          @transport.send(:apply_get_headers, request, 'application/json', uri)
+
+          assert_nil request.headers['From']
+        end
+
+        def test_apply_head_headers_sets_from_when_configured
+          transport_with_from = Seldon::Support::HttpClient::HttpTransport.new(
+            operation_delay_manager: FakeDelayManager.new,
+            from_email: 'bot@example.com'
+          )
+          request = HttpClientTestHelpers::FakeRequest.new
+          uri = URI('https://example.com/path')
+          transport_with_from.send(:apply_head_headers, request, uri)
+
+          assert_equal 'bot@example.com', request.headers['From']
+        end
       end
     end
   end

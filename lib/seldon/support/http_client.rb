@@ -30,7 +30,9 @@ module Seldon
         max_retries: 3,
         retry_initial_delay: 0.5,
         retry_backoff_factor: 2.0,
-        too_many_requests_delay: 60
+        retry_jitter: 0.25,
+        too_many_requests_delay: 60,
+        service_unavailable_delay: 60
       }.freeze
 
       RETRYABLE_ERRORS = [
@@ -50,6 +52,18 @@ module Seldon
 
         def initialize(url:, retry_after:, origin_url:, operation:)
           super("HTTP 429 Too Many Requests for #{url}")
+          @url = url
+          @retry_after = retry_after
+          @origin_url = origin_url
+          @operation = operation
+        end
+      end
+
+      class ServiceUnavailableError < StandardError
+        attr_reader :retry_after, :url, :origin_url, :operation
+
+        def initialize(url:, retry_after:, origin_url:, operation:)
+          super("HTTP 503 Service Unavailable for #{url}")
           @url = url
           @retry_after = retry_after
           @origin_url = origin_url
@@ -99,10 +113,13 @@ module Seldon
                      max_retries: DEFAULTS[:max_retries],
                      retry_initial_delay: DEFAULTS[:retry_initial_delay],
                      retry_backoff_factor: DEFAULTS[:retry_backoff_factor],
+                     retry_jitter: DEFAULTS[:retry_jitter],
                      allow_insecure_fallback: DEFAULTS[:allow_insecure_fallback],
                      too_many_requests_delay: DEFAULTS[:too_many_requests_delay],
+                     service_unavailable_delay: DEFAULTS[:service_unavailable_delay],
                      host_operation_delays: nil,
-                     cookie_jar: nil)
+                     cookie_jar: nil,
+                     from_email: nil)
         @user_agent = user_agent
         @delay = delay
         @max_redirects = max_redirects
@@ -113,7 +130,9 @@ module Seldon
         @max_retries = [max_retries.to_i, 1].max
         @retry_initial_delay = retry_initial_delay
         @retry_backoff_factor = retry_backoff_factor
+        @retry_jitter = retry_jitter
         @too_many_requests_delay = too_many_requests_delay
+        @service_unavailable_delay = service_unavailable_delay
 
         @operation_delay_manager = OperationDelayManager.new(host_operation_delays: host_operation_delays)
         @transport = HttpTransport.new(
@@ -122,10 +141,12 @@ module Seldon
           read_timeout: @read_timeout,
           allow_insecure_fallback: @allow_insecure_fallback,
           operation_delay_manager: @operation_delay_manager,
-          cookie_jar: cookie_jar
+          cookie_jar: cookie_jar,
+          from_email: from_email
         )
         @response_processor = ResponseProcessor.new(
-          too_many_requests_delay: @too_many_requests_delay
+          too_many_requests_delay: @too_many_requests_delay,
+          service_unavailable_delay: @service_unavailable_delay
         )
         @request_flow = RequestFlow.new(
           transport: @transport,
@@ -153,14 +174,21 @@ module Seldon
         rescue TooManyRequestsError => e
           raise if attempt > @max_retries
 
-          wait = e.retry_after || @too_many_requests_delay
-          log_too_many_requests_backoff(e, wait, attempt: attempt, max_attempts: max_attempts)
+          wait = apply_jitter(e.retry_after || @too_many_requests_delay)
+          log_rate_limit_backoff(e, wait, status: 429, attempt: attempt, max_attempts: max_attempts)
+          sleep wait
+          retry
+        rescue ServiceUnavailableError => e
+          raise if attempt > @max_retries
+
+          wait = apply_jitter(e.retry_after || @service_unavailable_delay)
+          log_rate_limit_backoff(e, wait, status: 503, attempt: attempt, max_attempts: max_attempts)
           sleep wait
           retry
         rescue *RETRYABLE_ERRORS => e
           raise if attempt > @max_retries
 
-          wait = @retry_initial_delay * (@retry_backoff_factor**(attempt - 1))
+          wait = apply_jitter(@retry_initial_delay * (@retry_backoff_factor**(attempt - 1)))
           logger.debug(
             "Retrying #{url} after #{e.class} (#{e.message}) in #{format('%.2f', wait)}s " \
             "(attempt #{attempt}/#{max_attempts})"
@@ -191,14 +219,21 @@ module Seldon
         rescue TooManyRequestsError => e
           raise if attempt > @max_retries
 
-          wait = e.retry_after || @too_many_requests_delay
-          log_too_many_requests_backoff(e, wait, attempt: attempt, max_attempts: max_attempts)
+          wait = apply_jitter(e.retry_after || @too_many_requests_delay)
+          log_rate_limit_backoff(e, wait, status: 429, attempt: attempt, max_attempts: max_attempts)
+          sleep wait
+          retry
+        rescue ServiceUnavailableError => e
+          raise if attempt > @max_retries
+
+          wait = apply_jitter(e.retry_after || @service_unavailable_delay)
+          log_rate_limit_backoff(e, wait, status: 503, attempt: attempt, max_attempts: max_attempts)
           sleep wait
           retry
         rescue *RETRYABLE_ERRORS => e
           raise if attempt > @max_retries
 
-          wait = @retry_initial_delay * (@retry_backoff_factor**(attempt - 1))
+          wait = apply_jitter(@retry_initial_delay * (@retry_backoff_factor**(attempt - 1)))
           logger.warn(
             "Retrying HEAD #{url} after #{e.class} (#{e.message}) in #{format('%.2f', wait)}s " \
             "(attempt #{attempt}/#{max_attempts})"
@@ -253,8 +288,21 @@ module Seldon
             return nil
           end
 
-          wait = e.retry_after || @too_many_requests_delay
-          log_too_many_requests_backoff(e, wait, attempt: attempt, max_attempts: max_attempts)
+          wait = apply_jitter(e.retry_after || @too_many_requests_delay)
+          log_rate_limit_backoff(e, wait, status: 429, attempt: attempt, max_attempts: max_attempts)
+          sleep wait
+          retry
+        rescue ServiceUnavailableError => e
+          if attempt > @max_retries
+            logger.warn(
+              "Status check failed for #{url} after #{max_attempts} attempts: " \
+              'HTTP 503 Service Unavailable'
+            )
+            return nil
+          end
+
+          wait = apply_jitter(e.retry_after || @service_unavailable_delay)
+          log_rate_limit_backoff(e, wait, status: 503, attempt: attempt, max_attempts: max_attempts)
           sleep wait
           retry
         rescue *RETRYABLE_ERRORS => e
@@ -266,7 +314,7 @@ module Seldon
             return nil
           end
 
-          wait = @retry_initial_delay * (@retry_backoff_factor**(attempt - 1))
+          wait = apply_jitter(@retry_initial_delay * (@retry_backoff_factor**(attempt - 1)))
           logger.debug(
             "Retrying #{url} after #{e.class} (#{e.message}) in #{format('%.2f', wait)}s " \
             "(attempt #{attempt}/#{max_attempts})"
@@ -284,12 +332,19 @@ module Seldon
 
       private
 
-      def log_too_many_requests_backoff(error, wait, attempt:, max_attempts:)
+      def apply_jitter(base_wait)
+        return base_wait if @retry_jitter.nil? || @retry_jitter <= 0
+
+        jitter_range = base_wait * @retry_jitter
+        base_wait + rand(-jitter_range..jitter_range)
+      end
+
+      def log_rate_limit_backoff(error, wait, status:, attempt:, max_attempts:)
         operation = error.operation || 'unknown'
         origin = error.origin_url || 'unknown'
         request = error.url || 'unknown'
         logger.warn(
-          "Backoff after 429 during #{operation} " \
+          "Backoff after #{status} during #{operation} " \
           "(origin=#{origin}, request=#{request}) for #{format('%.2f', wait)}s " \
           "(attempt #{attempt}/#{max_attempts})"
         )
