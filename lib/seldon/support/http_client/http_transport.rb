@@ -32,9 +32,9 @@ module Seldon
           @from_email = from_email
         end
 
-        def execute_get(uri, accept, operation: nil, referer: nil, &)
+        def execute_get(uri, accept, operation: nil, referer: nil, if_modified_since: nil, if_none_match: nil, &)
           @operation_delay_manager.apply_delay(operation, uri)
-          response = perform_with_fallbacks(:get, uri, accept, referer:, &)
+          response = perform_with_fallbacks(:get, uri, accept, referer:, if_modified_since:, if_none_match:, &)
           store_cookies(uri, response)
           response
         end
@@ -48,11 +48,13 @@ module Seldon
 
         private
 
-        def perform_with_fallbacks(method, uri, accept, referer: nil, &)
+        def perform_with_fallbacks(method, uri, accept, referer: nil, if_modified_since: nil, if_none_match: nil, &)
           HTTP_VERSIONS.each_with_index do |version, index|
-            return perform_request(method, uri, accept, verify: true, http_version: version[:option].to_sym, referer:, &)
+            return perform_request(method, uri, accept, verify: true, http_version: version[:option].to_sym,
+                                                        referer:, if_modified_since:, if_none_match:, &)
           rescue Faraday::SSLError => e
-            return retry_without_verification(method, uri, accept, e, http_version: version[:option].to_sym, referer:, &)
+            return retry_without_verification(method, uri, accept, e, http_version: version[:option].to_sym,
+                                                                      referer:, if_modified_since:, if_none_match:, &)
           rescue Faraday::ConnectionFailed, Faraday::TimeoutError => e
             next_version = HTTP_VERSIONS[index + 1]
             if next_version
@@ -66,12 +68,14 @@ module Seldon
           end
         end
 
-        def perform_request(method, uri, accept, verify:, http_version:, referer: nil, &)
+        def perform_request(method, uri, accept, verify:, http_version:, referer: nil,
+                            if_modified_since: nil, if_none_match: nil, &)
           connection = build_connection(uri, verify: verify, http_version: http_version)
           response = case method
                      when :get
                        connection.get(uri.to_s) do |request|
-                         apply_get_headers(request, accept, uri, referer:)
+                         apply_get_headers(request, accept, uri, referer:,
+                                                                 if_modified_since:, if_none_match:)
                        end
                      when :head
                        connection.head(uri.to_s) do |request|
@@ -110,12 +114,14 @@ module Seldon
           }
         end
 
-        def apply_get_headers(request, accept, uri, referer: nil)
+        def apply_get_headers(request, accept, uri, referer: nil, if_modified_since: nil, if_none_match: nil)
           request.headers['User-Agent'] = @user_agent
           request.headers['Accept'] = accept
           request.headers['Accept-Encoding'] = 'identity'
           request.headers['Referer'] = referer if referer
           request.headers['From'] = @from_email if @from_email
+          request.headers['If-Modified-Since'] = if_modified_since if if_modified_since
+          request.headers['If-None-Match'] = if_none_match if if_none_match
           apply_cookies(request, uri)
         end
 
@@ -138,11 +144,13 @@ module Seldon
           @cookie_jar.store_from_response(uri, response.headers)
         end
 
-        def retry_without_verification(method, uri, accept, error, http_version:, referer: nil, &)
+        def retry_without_verification(method, uri, accept, error, http_version:, referer: nil,
+                                       if_modified_since: nil, if_none_match: nil, &)
           return handle_terminal_ssl_error(uri, error) unless @allow_insecure_fallback
 
           logger.warn "SSL error (#{error.message}), retrying without verification for #{uri}"
-          perform_request(method, uri, accept, verify: false, http_version:, referer:, &)
+          perform_request(method, uri, accept, verify: false, http_version:, referer:,
+                                               if_modified_since:, if_none_match:, &)
         end
 
         def handle_terminal_ssl_error(uri, error)
