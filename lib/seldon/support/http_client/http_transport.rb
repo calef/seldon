@@ -20,22 +20,28 @@ module Seldon
         def initialize(operation_delay_manager:, user_agent: HttpClient::UA,
                        open_timeout: HttpClient::DEFAULTS[:timeout],
                        read_timeout: HttpClient::DEFAULTS[:timeout],
-                       allow_insecure_fallback: HttpClient::DEFAULTS[:allow_insecure_fallback])
+                       allow_insecure_fallback: HttpClient::DEFAULTS[:allow_insecure_fallback],
+                       cookie_jar: nil)
           @user_agent = user_agent
           @open_timeout = open_timeout
           @read_timeout = read_timeout
           @allow_insecure_fallback = allow_insecure_fallback
           @operation_delay_manager = operation_delay_manager
+          @cookie_jar = cookie_jar
         end
 
         def execute_get(uri, accept, operation: nil, &)
           @operation_delay_manager.apply_delay(operation, uri)
-          perform_with_fallbacks(:get, uri, accept, &)
+          response = perform_with_fallbacks(:get, uri, accept, &)
+          store_cookies(uri, response)
+          response
         end
 
         def execute_head(uri, operation: nil)
           @operation_delay_manager.apply_delay(operation, uri)
-          perform_with_fallbacks(:head, uri, nil)
+          response = perform_with_fallbacks(:head, uri, nil)
+          store_cookies(uri, response)
+          response
         end
 
         private
@@ -63,11 +69,11 @@ module Seldon
           response = case method
                      when :get
                        connection.get(uri.to_s) do |request|
-                         apply_get_headers(request, accept)
+                         apply_get_headers(request, accept, uri)
                        end
                      when :head
                        connection.head(uri.to_s) do |request|
-                         apply_head_headers(request)
+                         apply_head_headers(request, uri)
                        end
                      else
                        raise ArgumentError, "Unsupported method #{method}"
@@ -102,14 +108,29 @@ module Seldon
           }
         end
 
-        def apply_get_headers(request, accept)
+        def apply_get_headers(request, accept, uri)
           request.headers['User-Agent'] = @user_agent
           request.headers['Accept'] = accept
           request.headers['Accept-Encoding'] = 'identity'
+          apply_cookies(request, uri)
         end
 
-        def apply_head_headers(request)
+        def apply_head_headers(request, uri)
           request.headers['User-Agent'] = @user_agent
+          apply_cookies(request, uri)
+        end
+
+        def apply_cookies(request, uri)
+          return unless @cookie_jar
+
+          cookie_header = @cookie_jar.cookie_header_for(uri)
+          request.headers['Cookie'] = cookie_header if cookie_header
+        end
+
+        def store_cookies(uri, response)
+          return unless @cookie_jar && response&.headers
+
+          @cookie_jar.store_from_response(uri, response.headers)
         end
 
         def retry_without_verification(method, uri, accept, error, http_version:, &)

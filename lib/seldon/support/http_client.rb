@@ -11,6 +11,7 @@ require_relative 'http_client/http_transport'
 require_relative 'http_client/response_processor'
 require_relative 'http_client/request_flow'
 require_relative 'http_client/operation_delay_manager'
+require_relative 'cookie_jar'
 
 module Seldon
   module Support
@@ -100,7 +101,8 @@ module Seldon
                      retry_backoff_factor: DEFAULTS[:retry_backoff_factor],
                      allow_insecure_fallback: DEFAULTS[:allow_insecure_fallback],
                      too_many_requests_delay: DEFAULTS[:too_many_requests_delay],
-                     host_operation_delays: nil)
+                     host_operation_delays: nil,
+                     cookie_jar: nil)
         @user_agent = user_agent
         @delay = delay
         @max_redirects = max_redirects
@@ -119,7 +121,8 @@ module Seldon
           open_timeout: @open_timeout,
           read_timeout: @read_timeout,
           allow_insecure_fallback: @allow_insecure_fallback,
-          operation_delay_manager: @operation_delay_manager
+          operation_delay_manager: @operation_delay_manager,
+          cookie_jar: cookie_jar
         )
         @response_processor = ResponseProcessor.new(
           too_many_requests_delay: @too_many_requests_delay

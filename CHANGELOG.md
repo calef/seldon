@@ -1,5 +1,11 @@
 # Change Notes
 
+## [0.4.0] - 2026-01-21
+
+- Added `CookieJar` class for managing HTTP cookies per RFC 6265, with support for domain/path matching, Secure/HttpOnly attributes, and expiration handling.
+- `HttpClient` now accepts an optional `cookie_jar` parameter to enable automatic cookie storage and transmission across requests and redirects.
+- Cookies are persisted via `to_h`/`load` methods for session persistence.
+
 ## [0.3.1] - 2026-01-06
 
 - Bumped Bundler to 4.0.3 and refreshed the lockfile, including the Minitest 6.0.1 update.
