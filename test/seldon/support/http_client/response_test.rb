@@ -53,14 +53,14 @@ module Seldon
           assert_equal 200, result[:status]
         end
 
-        def test_log_too_many_requests_backoff_includes_details
+        def test_log_rate_limit_backoff_includes_details
           error = Seldon::Support::HttpClient::TooManyRequestsError.new(
             url: 'https://example.com/fail',
             retry_after: 10,
             origin_url: 'https://origin',
             operation: 'content_fetch'
           )
-          @client.send(:log_too_many_requests_backoff, error, 10, attempt: 1, max_attempts: 3)
+          @client.send(:log_rate_limit_backoff, error, 10, status: 429, attempt: 1, max_attempts: 3)
           message = @logger.warns.last
           assert_includes message, 'Backoff after 429'
           assert_includes message, 'content_fetch'
@@ -112,6 +112,54 @@ module Seldon
           assert_raises(Seldon::Support::HttpClient::TooManyRequestsError) do
             request_flow.fetch_with_redirects('https://example.com', 'text/html', origin_url: 'https://example.com', operation: 'op')
           end
+        end
+
+        def test_perform_request_raises_on_service_unavailable
+          response = HttpClientTestHelpers::FakeResponse.new(503, {})
+          transport = Object.new
+          transport.define_singleton_method(:execute_get) { |_uri, _accept, operation: nil, referer: nil| response }
+          request_flow = build_request_flow(transport, max_redirects: 2)
+          assert_raises(Seldon::Support::HttpClient::ServiceUnavailableError) do
+            request_flow.fetch_with_redirects('https://example.com', 'text/html', origin_url: 'https://example.com', operation: 'op')
+          end
+        end
+
+        def test_service_unavailable_parses_retry_after
+          response = HttpClientTestHelpers::FakeResponse.new(503, { 'retry-after' => '30' })
+          processor = Seldon::Support::HttpClient::ResponseProcessor.new(service_unavailable_delay: 120)
+          error = assert_raises(Seldon::Support::HttpClient::ServiceUnavailableError) do
+            processor.check_status?(response, URI('https://example.com'), origin_url: 'origin', operation: 'op')
+          end
+          assert_equal 30, error.retry_after
+        end
+
+        def test_service_unavailable_uses_default_delay_when_no_header
+          response = HttpClientTestHelpers::FakeResponse.new(503, {})
+          processor = Seldon::Support::HttpClient::ResponseProcessor.new(service_unavailable_delay: 120)
+          error = assert_raises(Seldon::Support::HttpClient::ServiceUnavailableError) do
+            processor.check_status?(response, URI('https://example.com'), origin_url: 'origin', operation: 'op')
+          end
+          assert_equal 120, error.retry_after
+        end
+
+        def test_apply_jitter_returns_value_within_expected_range
+          client = Seldon::Support::HttpClient.new(delay: 0, retry_jitter: 0.25)
+          # Test multiple times to ensure randomness stays in bounds
+          20.times do
+            result = client.send(:apply_jitter, 10.0)
+            assert result >= 7.5, "Expected >= 7.5, got #{result}"
+            assert result <= 12.5, "Expected <= 12.5, got #{result}"
+          end
+        end
+
+        def test_apply_jitter_returns_base_value_when_jitter_is_zero
+          client = Seldon::Support::HttpClient.new(delay: 0, retry_jitter: 0)
+          assert_equal 10.0, client.send(:apply_jitter, 10.0)
+        end
+
+        def test_apply_jitter_returns_base_value_when_jitter_is_nil
+          client = Seldon::Support::HttpClient.new(delay: 0, retry_jitter: nil)
+          assert_equal 10.0, client.send(:apply_jitter, 10.0)
         end
 
         def test_follow_redirect_requires_location_and_limit

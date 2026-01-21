@@ -1,5 +1,13 @@
 # Change Notes
 
+## [0.6.0] - 2026-01-21
+
+- Added HTTP 503 Service Unavailable handling with Retry-After header support, matching existing 429 behavior.
+- Added configurable jitter to exponential backoff (default ±25%) to prevent thundering herd on recovery.
+- Added optional `from_email:` parameter to `HttpClient` for setting the HTTP From header (RFC 7231) to provide abuse contacts.
+- New `service_unavailable_delay:` parameter (default 60s) for configuring default 503 retry delay.
+- New `retry_jitter:` parameter (default 0.25) for configuring backoff jitter factor.
+
 ## [0.5.0] - 2026-01-21
 
 - Added optional `referer:` parameter to `HttpClient#fetch` and `#response_for` for setting the HTTP Referer header on requests.

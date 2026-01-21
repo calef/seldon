@@ -11,15 +11,19 @@ module Seldon
         include Seldon::Loggable
 
         DEFAULT_TOO_MANY_REQUESTS_DELAY = 60
+        DEFAULT_SERVICE_UNAVAILABLE_DELAY = 60
 
-        def initialize(too_many_requests_delay: DEFAULT_TOO_MANY_REQUESTS_DELAY)
+        def initialize(too_many_requests_delay: DEFAULT_TOO_MANY_REQUESTS_DELAY,
+                       service_unavailable_delay: DEFAULT_SERVICE_UNAVAILABLE_DELAY)
           @too_many_requests_delay = too_many_requests_delay
+          @service_unavailable_delay = service_unavailable_delay
         end
 
         def check_status?(response, uri, origin_url:, operation:)
           status_code = response.status.to_i
 
           raise_too_many_requests(response, uri, origin_url: origin_url, operation: operation) if status_code == 429
+          raise_service_unavailable(response, uri, origin_url: origin_url, operation: operation) if status_code == 503
           raise ForbiddenError.new(url: uri.to_s, origin_url: origin_url, operation: operation) if status_code == 403
           raise NotFoundError.new(url: uri.to_s, origin_url: origin_url, operation: operation, status: status_code) if status_code == 404
 
@@ -37,19 +41,29 @@ module Seldon
           response.headers['location']
         end
 
-        def parse_retry_after(response)
+        def parse_retry_after(response, default_delay: @too_many_requests_delay)
           header = response&.headers&.[]('retry-after')
           parsed = parse_retry_after_value(header)
-          wait = parsed || @too_many_requests_delay
-          wait = @too_many_requests_delay if wait <= 0
+          wait = parsed || default_delay
+          wait = default_delay if wait <= 0
           wait
         end
 
         private
 
         def raise_too_many_requests(response, uri, origin_url:, operation:)
-          wait = parse_retry_after(response)
+          wait = parse_retry_after(response, default_delay: @too_many_requests_delay)
           raise TooManyRequestsError.new(
+            url: uri.to_s,
+            retry_after: wait,
+            origin_url: origin_url,
+            operation: operation
+          )
+        end
+
+        def raise_service_unavailable(response, uri, origin_url:, operation:)
+          wait = parse_retry_after(response, default_delay: @service_unavailable_delay)
+          raise ServiceUnavailableError.new(
             url: uri.to_s,
             retry_after: wait,
             origin_url: origin_url,
