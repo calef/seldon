@@ -51,10 +51,10 @@ module Seldon
         def perform_with_fallbacks(method, uri, accept, referer: nil, if_modified_since: nil, if_none_match: nil, &)
           HTTP_VERSIONS.each_with_index do |version, index|
             return perform_request(method, uri, accept, verify: true, http_version: version[:option].to_sym,
-                                   referer:, if_modified_since:, if_none_match:, &)
+                                                        referer:, if_modified_since:, if_none_match:, &)
           rescue Faraday::SSLError => e
             return retry_without_verification(method, uri, accept, e, http_version: version[:option].to_sym,
-                                              referer:, if_modified_since:, if_none_match:, &)
+                                                                      referer:, if_modified_since:, if_none_match:, &)
           rescue Faraday::ConnectionFailed, Faraday::TimeoutError => e
             next_version = HTTP_VERSIONS[index + 1]
             if next_version
@@ -75,7 +75,7 @@ module Seldon
                      when :get
                        connection.get(uri.to_s) do |request|
                          apply_get_headers(request, accept, uri, referer:,
-                                           if_modified_since:, if_none_match:)
+                                                                 if_modified_since:, if_none_match:)
                        end
                      when :head
                        connection.head(uri.to_s) do |request|
@@ -150,7 +150,7 @@ module Seldon
 
           logger.warn "SSL error (#{error.message}), retrying without verification for #{uri}"
           perform_request(method, uri, accept, verify: false, http_version:, referer:,
-                          if_modified_since:, if_none_match:, &)
+                                               if_modified_since:, if_none_match:, &)
         end
 
         def handle_terminal_ssl_error(uri, error)
