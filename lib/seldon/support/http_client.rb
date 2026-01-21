@@ -108,6 +108,17 @@ module Seldon
         end
       end
 
+      class NotModifiedError < StandardError
+        attr_reader :url, :origin_url, :operation
+
+        def initialize(url:, origin_url:, operation:)
+          super("HTTP 304 Not Modified for #{url}")
+          @url = url
+          @origin_url = origin_url
+          @operation = operation
+        end
+      end
+
       def initialize(user_agent: UA, delay: DEFAULTS[:delay], max_redirects: DEFAULTS[:max_redirects],
                      timeout: nil, open_timeout: nil, read_timeout: nil,
                      max_retries: DEFAULTS[:max_retries],
@@ -155,7 +166,7 @@ module Seldon
         )
       end
 
-      def fetch(url, accept:, referer: nil)
+      def fetch(url, accept:, referer: nil, if_modified_since: nil, if_none_match: nil)
         attempt = 0
         max_attempts = @max_retries + 1
         begin
@@ -165,9 +176,14 @@ module Seldon
             accept,
             origin_url: url,
             operation: 'content_fetch',
-            referer:
+            referer:,
+            if_modified_since:,
+            if_none_match:
           )
           sleep @delay
+        rescue NotModifiedError
+          sleep @delay
+          return { not_modified: true, final_url: url }
         rescue ForbiddenError => e
           logger.warn "Access forbidden (HTTP 403) for #{url}, not retrying"
           raise

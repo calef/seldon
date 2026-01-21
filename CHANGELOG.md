@@ -1,5 +1,11 @@
 # Change Notes
 
+## [0.7.0] - 2026-01-21
+
+- Added conditional request support with `if_modified_since:` and `if_none_match:` parameters to `HttpClient#fetch`.
+- Returns `{ not_modified: true }` when server responds with HTTP 304 Not Modified, enabling bandwidth savings.
+- New `NotModifiedError` class for internal 304 handling.
+
 ## [0.6.0] - 2026-01-21
 
 - Added HTTP 503 Service Unavailable handling with Retry-After header support, matching existing 429 behavior.

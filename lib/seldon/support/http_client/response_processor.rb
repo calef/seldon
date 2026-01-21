@@ -22,6 +22,7 @@ module Seldon
         def check_status?(response, uri, origin_url:, operation:)
           status_code = response.status.to_i
 
+          raise_not_modified(uri, origin_url: origin_url, operation: operation) if status_code == 304
           raise_too_many_requests(response, uri, origin_url: origin_url, operation: operation) if status_code == 429
           raise_service_unavailable(response, uri, origin_url: origin_url, operation: operation) if status_code == 503
           raise ForbiddenError.new(url: uri.to_s, origin_url: origin_url, operation: operation) if status_code == 403
@@ -34,7 +35,7 @@ module Seldon
 
         def redirect?(response)
           status = response.status.to_i
-          status >= 300 && status < 400
+          status >= 300 && status < 400 && status != 304
         end
 
         def extract_redirect_location(response)
@@ -50,6 +51,14 @@ module Seldon
         end
 
         private
+
+        def raise_not_modified(uri, origin_url:, operation:)
+          raise NotModifiedError.new(
+            url: uri.to_s,
+            origin_url: origin_url,
+            operation: operation
+          )
+        end
 
         def raise_too_many_requests(response, uri, origin_url:, operation:)
           wait = parse_retry_after(response, default_delay: @too_many_requests_delay)

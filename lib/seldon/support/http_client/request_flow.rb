@@ -17,8 +17,10 @@ module Seldon
           @max_redirects = max_redirects
         end
 
-        def fetch_with_redirects(url, accept, origin_url:, operation:, referer: nil)
-          perform_request(url, accept, @max_redirects, origin_url:, operation:, referer:)
+        def fetch_with_redirects(url, accept, origin_url:, operation:, referer: nil,
+                                  if_modified_since: nil, if_none_match: nil)
+          perform_request(url, accept, @max_redirects, origin_url:, operation:, referer:,
+                          if_modified_since:, if_none_match:)
         end
 
         def resolve_head_redirects(uri, origin_url:, operation:)
@@ -27,12 +29,14 @@ module Seldon
 
         private
 
-        def perform_request(url, accept, remaining_redirects, origin_url:, operation:, referer: nil)
+        def perform_request(url, accept, remaining_redirects, origin_url:, operation:, referer: nil,
+                            if_modified_since: nil, if_none_match: nil)
           uri = URI.parse(url)
           body = nil
           redirect = nil
           status_checked = false
-          response = @transport.execute_get(uri, accept, operation:, referer:) do |http_response|
+          response = @transport.execute_get(uri, accept, operation:, referer:,
+                                            if_modified_since:, if_none_match:) do |http_response|
             redirect = @response_processor.redirect?(http_response)
             unless redirect
               @response_processor.check_status?(http_response, uri, origin_url: origin_url, operation: operation)
