@@ -22,7 +22,8 @@ module Seldon
                        read_timeout: HttpClient::DEFAULTS[:timeout],
                        allow_insecure_fallback: HttpClient::DEFAULTS[:allow_insecure_fallback],
                        cookie_jar: nil,
-                       from_email: nil)
+                       from_email: nil,
+                       accept_language: nil)
           @user_agent = user_agent
           @open_timeout = open_timeout
           @read_timeout = read_timeout
@@ -30,6 +31,7 @@ module Seldon
           @operation_delay_manager = operation_delay_manager
           @cookie_jar = cookie_jar
           @from_email = from_email
+          @accept_language = accept_language
         end
 
         def execute_get(uri, accept, operation: nil, referer: nil, if_modified_since: nil, if_none_match: nil, &)
@@ -118,6 +120,7 @@ module Seldon
           request.headers['User-Agent'] = @user_agent
           request.headers['Accept'] = accept
           request.headers['Accept-Encoding'] = 'identity'
+          request.headers['Accept-Language'] = @accept_language if @accept_language
           request.headers['Referer'] = referer if referer
           request.headers['From'] = @from_email if @from_email
           request.headers['If-Modified-Since'] = if_modified_since if if_modified_since
@@ -127,6 +130,7 @@ module Seldon
 
         def apply_head_headers(request, uri)
           request.headers['User-Agent'] = @user_agent
+          request.headers['Accept-Language'] = @accept_language if @accept_language
           request.headers['From'] = @from_email if @from_email
           apply_cookies(request, uri)
         end

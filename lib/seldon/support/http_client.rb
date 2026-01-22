@@ -130,7 +130,8 @@ module Seldon
                      service_unavailable_delay: DEFAULTS[:service_unavailable_delay],
                      host_operation_delays: nil,
                      cookie_jar: nil,
-                     from_email: nil)
+                     from_email: nil,
+                     accept_language: nil)
         @user_agent = user_agent
         @delay = delay
         @max_redirects = max_redirects
@@ -153,7 +154,8 @@ module Seldon
           allow_insecure_fallback: @allow_insecure_fallback,
           operation_delay_manager: @operation_delay_manager,
           cookie_jar: cookie_jar,
-          from_email: from_email
+          from_email: from_email,
+          accept_language: accept_language
         )
         @response_processor = ResponseProcessor.new(
           too_many_requests_delay: @too_many_requests_delay,
