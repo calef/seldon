@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'uri'
+require_relative 'url_normalizer'
 
 module Seldon
   module Support
@@ -50,6 +51,22 @@ module Seldon
         return false unless url
 
         NON_FEED_URL_PATTERNS.any? { |pattern| url.match?(pattern) }
+      end
+
+      # Extract the base URL (scheme + host + optional non-default port) from a URL.
+      # Returns nil if the URL is invalid or missing required components.
+      def base_url_for(url)
+        normalized = UrlNormalizer.normalize(url)
+        return nil unless normalized
+
+        uri = URI.parse(normalized)
+        return nil unless uri.scheme && uri.host
+
+        base = "#{uri.scheme}://#{uri.host}"
+        base += ":#{uri.port}" if uri.port && uri.port != uri.default_port
+        base
+      rescue URI::Error
+        nil
       end
     end
   end
