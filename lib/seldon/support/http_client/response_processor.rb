@@ -12,11 +12,14 @@ module Seldon
 
         DEFAULT_TOO_MANY_REQUESTS_DELAY = 60
         DEFAULT_SERVICE_UNAVAILABLE_DELAY = 60
+        DEFAULT_MAX_RETRY_AFTER_DELAY = 300
 
         def initialize(too_many_requests_delay: DEFAULT_TOO_MANY_REQUESTS_DELAY,
-                       service_unavailable_delay: DEFAULT_SERVICE_UNAVAILABLE_DELAY)
+                       service_unavailable_delay: DEFAULT_SERVICE_UNAVAILABLE_DELAY,
+                       max_retry_after_delay: DEFAULT_MAX_RETRY_AFTER_DELAY)
           @too_many_requests_delay = too_many_requests_delay
           @service_unavailable_delay = service_unavailable_delay
+          @max_retry_after_delay = max_retry_after_delay
         end
 
         def check_status?(response, uri, origin_url:, operation:)
@@ -47,6 +50,7 @@ module Seldon
           parsed = parse_retry_after_value(header)
           wait = parsed || default_delay
           wait = default_delay if wait <= 0
+          wait = [@max_retry_after_delay, wait].min if @max_retry_after_delay&.positive?
           wait
         end
 

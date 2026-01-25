@@ -172,11 +172,50 @@ class HttpClientTest < Minitest::Test
       origin_url: 'https://example.com',
       operation: 'content_fetch'
     )
-    
+
     @request_flow.stub(:fetch_with_redirects, proc { raise error }) do
       assert_raises(Seldon::Support::HttpClient::TooManyRequestsError) do
         @client.fetch('https://example.com', accept: 'text/html')
       end
     end
+  end
+
+  def test_retry_after_is_capped_to_max_delay
+    # Test that ResponseProcessor caps the retry-after value
+    processor = Seldon::Support::HttpClient::ResponseProcessor.new(
+      max_retry_after_delay: 60
+    )
+
+    # Mock response with a very long Retry-After header (1 hour)
+    response = Struct.new(:headers).new({ 'retry-after' => '3600' })
+    wait = processor.parse_retry_after(response, default_delay: 30)
+
+    # Should be capped to max_retry_after_delay (60), not the header value (3600)
+    assert_equal 60, wait
+  end
+
+  def test_retry_after_respects_header_when_under_max
+    processor = Seldon::Support::HttpClient::ResponseProcessor.new(
+      max_retry_after_delay: 300
+    )
+
+    # Mock response with a reasonable Retry-After header
+    response = Struct.new(:headers).new({ 'retry-after' => '120' })
+    wait = processor.parse_retry_after(response, default_delay: 30)
+
+    # Should use the header value since it's under the max
+    assert_equal 120, wait
+  end
+
+  def test_retry_after_uses_default_when_no_header
+    processor = Seldon::Support::HttpClient::ResponseProcessor.new(
+      max_retry_after_delay: 300
+    )
+
+    response = Struct.new(:headers).new({})
+    wait = processor.parse_retry_after(response, default_delay: 30)
+
+    # Should use the default since no header is present
+    assert_equal 30, wait
   end
 end
