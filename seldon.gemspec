@@ -11,7 +11,7 @@ Gem::Specification.new do |spec|
   spec.email         = ['devs@kingcounty.solutions']
   spec.license       = 'MIT'
   spec.homepage      = 'https://github.com/calef/seldon'
-  spec.required_ruby_version = '>= 3.2.0'
+  spec.required_ruby_version = '>= 3.4.8'
 
   spec.files = Dir.glob('lib/**/*.rb') + %w[README.md LICENSE]
   spec.require_paths = ['lib']
