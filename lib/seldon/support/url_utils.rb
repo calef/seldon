@@ -54,17 +54,30 @@ module Seldon
       end
 
       # Extract the base URL (scheme + host + optional non-default port) from a URL.
+      # Accepts either a String URL or a URI instance.
       # Returns nil if the URL is invalid or missing required components.
-      def base_url_for(url)
-        normalized = UrlNormalizer.normalize(url)
-        return nil unless normalized
+      def base_url_for(url_or_uri)
+        uri =
+          case url_or_uri
+          when URI
+            url_or_uri
+          else
+            normalized = UrlNormalizer.normalize(url_or_uri)
+            return nil unless normalized
 
-        uri = URI.parse(normalized)
+            URI.parse(normalized)
+          end
+
         return nil unless uri.scheme && uri.host
 
-        base = "#{uri.scheme}://#{uri.host}"
-        base += ":#{uri.port}" if uri.port && uri.port != uri.default_port
-        base
+        port = uri.port
+        port = nil if !port || port == uri.default_port
+
+        URI::Generic.build(
+          scheme: uri.scheme,
+          host: uri.host,
+          port: port
+        ).to_s
       rescue URI::Error
         nil
       end
