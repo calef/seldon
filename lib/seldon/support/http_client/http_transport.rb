@@ -3,6 +3,7 @@
 require 'faraday'
 require 'faraday/typhoeus'
 require 'uri'
+require_relative '../url_utils'
 
 module Seldon
   module Support
@@ -101,12 +102,7 @@ module Seldon
         end
 
         def base_url_for(uri)
-          default_port = uri.scheme == 'https' ? 443 : 80
-          if uri.port && uri.port != default_port
-            "#{uri.scheme}://#{uri.host}:#{uri.port}"
-          else
-            "#{uri.scheme}://#{uri.host}"
-          end
+          UrlUtils.base_url_for(uri)
         end
 
         def request_options
