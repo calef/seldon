@@ -55,4 +55,12 @@ class UrlUtilsTest < Minitest::Test
   def test_base_url_for_handles_subdomain
     assert_equal 'https://www.example.com', Seldon::Support::UrlUtils.base_url_for('https://www.example.com/page')
   end
+
+  def test_base_url_for_handles_ipv6_with_port
+    assert_equal 'http://[::1]:3000', Seldon::Support::UrlUtils.base_url_for('http://[::1]:3000/foo')
+  end
+
+  def test_base_url_for_handles_ipv6_default_port
+    assert_equal 'http://[::1]', Seldon::Support::UrlUtils.base_url_for('http://[::1]:80/foo')
+  end
 end
