@@ -1,5 +1,9 @@
 # Change Notes
 
+## [0.8.0] - 2026-01-26
+
+- Added `max_retry_after_delay` parameter to HttpClient (default: 300 seconds) to cap Retry-After header values from 429/503 responses, preventing indefinite blocking from misbehaving servers.
+
 ## [0.7.0] - 2026-01-21
 
 - Added conditional request support with `if_modified_since:` and `if_none_match:` parameters to `HttpClient#fetch`.

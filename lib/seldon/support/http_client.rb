@@ -32,7 +32,8 @@ module Seldon
         retry_backoff_factor: 2.0,
         retry_jitter: 0.25,
         too_many_requests_delay: 60,
-        service_unavailable_delay: 60
+        service_unavailable_delay: 60,
+        max_retry_after_delay: 300
       }.freeze
 
       RETRYABLE_ERRORS = [
@@ -128,6 +129,7 @@ module Seldon
                      allow_insecure_fallback: DEFAULTS[:allow_insecure_fallback],
                      too_many_requests_delay: DEFAULTS[:too_many_requests_delay],
                      service_unavailable_delay: DEFAULTS[:service_unavailable_delay],
+                     max_retry_after_delay: DEFAULTS[:max_retry_after_delay],
                      host_operation_delays: nil,
                      cookie_jar: nil,
                      from_email: nil,
@@ -145,6 +147,7 @@ module Seldon
         @retry_jitter = retry_jitter
         @too_many_requests_delay = too_many_requests_delay
         @service_unavailable_delay = service_unavailable_delay
+        @max_retry_after_delay = max_retry_after_delay
 
         @operation_delay_manager = OperationDelayManager.new(host_operation_delays: host_operation_delays)
         @transport = HttpTransport.new(
@@ -159,7 +162,8 @@ module Seldon
         )
         @response_processor = ResponseProcessor.new(
           too_many_requests_delay: @too_many_requests_delay,
-          service_unavailable_delay: @service_unavailable_delay
+          service_unavailable_delay: @service_unavailable_delay,
+          max_retry_after_delay: @max_retry_after_delay
         )
         @request_flow = RequestFlow.new(
           transport: @transport,
