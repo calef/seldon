@@ -1,5 +1,13 @@
 # Change Notes
 
+## [0.8.1] - 2026-02-14
+
+- Updated rubocop from 1.82.1 to 1.84.2
+- Updated parser from 3.3.10.0 to 3.3.10.1
+- Updated faraday from 2.14.0 to 2.14.1
+- Updated json from 2.18.0 to 2.18.1
+- Updated prism from 1.7.0 to 1.9.0
+
 ## [0.8.0] - 2026-01-26
 
 - Added `max_retry_after_delay` parameter to HttpClient (default: 300 seconds) to cap Retry-After header values from 429/503 responses, preventing indefinite blocking from misbehaving servers.
