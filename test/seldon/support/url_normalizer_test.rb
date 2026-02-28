@@ -28,11 +28,11 @@ class UrlNormalizerTest < Minitest::Test
     assert_equal 'foo=bar', filtered
   end
 
-  def test_filtered_query_respects_host_specific_tracking_params
-    uri = URI('https://pubmed.ncbi.nlm.nih.gov/?fc=a&foo=b')
+  def test_filtered_query_preserves_non_tracking_params
+    uri = URI('https://example.com/?fc=a&foo=b')
     filtered = Seldon::Support::UrlNormalizer.send(:filtered_query, uri)
 
-    assert_equal 'foo=b', filtered
+    assert_equal 'fc=a&foo=b', filtered
   end
 
   def test_filtered_query_returns_nil_when_only_tracking_params

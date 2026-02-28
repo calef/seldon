@@ -8,10 +8,11 @@ module Seldon
     # Manages HTTP cookies for a session, handling storage, retrieval,
     # and Set-Cookie header parsing per RFC 6265.
     class CookieJar
-      Cookie = Struct.new(:name, :value, :domain, :path, :expires, :secure, :http_only, keyword_init: true)
+      Cookie = Struct.new(:name, :value, :domain, :path, :expires, :secure, :http_only)
 
       def initialize
         @cookies = {} # domain -> path -> name -> Cookie
+        @mutex = Mutex.new
       end
 
       # Extract and store cookies from Set-Cookie header(s)
@@ -19,7 +20,9 @@ module Seldon
         return unless response_headers
 
         set_cookies = extract_set_cookie_headers(response_headers)
-        set_cookies.each { |header| parse_and_store(uri, header) }
+        @mutex.synchronize do
+          set_cookies.each { |header| parse_and_store(uri, header) }
+        end
       end
 
       # Generate Cookie header value for a request
@@ -39,93 +42,103 @@ module Seldon
         secure = uri.scheme == 'https'
         now = Time.now
 
-        matching = []
-        @cookies.each do |domain, paths|
-          next unless domain_matches?(host, domain)
+        @mutex.synchronize do
+          matching = []
+          @cookies.each do |domain, paths|
+            next unless domain_matches?(host, domain)
 
-          paths.each do |cookie_path, names|
-            next unless path_matches?(path, cookie_path)
+            paths.each do |cookie_path, names|
+              next unless path_matches?(path, cookie_path)
 
-            names.each_value do |cookie|
-              next if cookie.secure && !secure
-              next if cookie.expires && cookie.expires < now
+              names.each_value do |cookie|
+                next if cookie.secure && !secure
+                next if cookie.expires && cookie.expires < now
 
-              matching << cookie
+                matching << cookie
+              end
             end
           end
+          matching
         end
-        matching
       end
 
       # Clear all cookies
       def clear
-        @cookies = {}
+        @mutex.synchronize { @cookies = {} }
       end
 
       # Clear expired cookies
       def clear_expired
         now = Time.now
-        @cookies.each_value do |paths|
-          paths.each_value do |names|
-            names.delete_if { |_, cookie| cookie.expires && cookie.expires < now }
+        @mutex.synchronize do
+          @cookies.each_value do |paths|
+            paths.each_value do |names|
+              names.delete_if { |_, cookie| cookie.expires && cookie.expires < now }
+            end
+            paths.delete_if { |_, names| names.empty? }
           end
-          paths.delete_if { |_, names| names.empty? }
+          @cookies.delete_if { |_, paths| paths.empty? }
         end
-        @cookies.delete_if { |_, paths| paths.empty? }
       end
 
       # Check if jar has any cookies
       def empty?
-        @cookies.empty?
+        @mutex.synchronize { @cookies.empty? }
       end
 
       # Count total cookies
       def size
-        @cookies.sum { |_, paths| paths.sum { |_, names| names.size } }
+        @mutex.synchronize do
+          @cookies.sum { |_, paths| paths.sum { |_, names| names.size } }
+        end
       end
 
       # Serialize to hash (for persistence)
       def to_h
-        result = {}
-        @cookies.each do |domain, paths|
-          result[domain] = {}
-          paths.each do |path, names|
-            result[domain][path] = {}
-            names.each do |name, cookie|
-              result[domain][path][name] = {
-                'value' => cookie.value,
-                'expires' => cookie.expires&.iso8601,
-                'secure' => cookie.secure,
-                'http_only' => cookie.http_only
-              }
+        @mutex.synchronize do
+          result = {}
+          @cookies.each do |domain, paths|
+            result[domain] = {}
+            paths.each do |path, names|
+              result[domain][path] = {}
+              names.each do |name, cookie|
+                result[domain][path][name] = {
+                  'value' => cookie.value,
+                  'expires' => cookie.expires&.iso8601,
+                  'secure' => cookie.secure,
+                  'http_only' => cookie.http_only
+                }
+              end
             end
           end
+          result
         end
-        result
       end
 
       # Load from hash (for persistence)
       def load(data)
         return unless data.is_a?(Hash)
 
-        data.each do |domain, paths|
-          next unless paths.is_a?(Hash)
+        @mutex.synchronize do
+          data.each do |domain, paths|
+            next unless paths.is_a?(Hash)
 
-          paths.each do |path, names|
-            next unless names.is_a?(Hash)
+            paths.each do |path, names|
+              next unless names.is_a?(Hash)
 
-            names.each do |name, attrs|
-              next unless attrs.is_a?(Hash)
+              names.each do |name, attrs|
+                next unless attrs.is_a?(Hash)
 
-              store(Cookie.new(
-                      name:,
-                      value: attrs['value'],
-                      domain:,
-                      path:,
-                      expires: attrs['expires'] ? Time.parse(attrs['expires']) : nil,
-                      secure: attrs['secure'] || false,
-                      http_only: attrs['http_only'] || false
-                    ))
+                store(Cookie.new(
+                        name:,
+                        value: attrs['value'],
+                        domain:,
+                        path:,
+                        expires: attrs['expires'] ? Time.parse(attrs['expires']) : nil,
+                        secure: attrs['secure'] || false,
+                        http_only: attrs['http_only'] || false
+                      ))
+              end
             end
           end
         end
@@ -217,6 +230,7 @@ module Seldon
         last_slash&.zero? ? '/' : path[0...last_slash]
       end
 
+      # Caller must hold @mutex
       def store(cookie)
         return unless cookie.domain
 
