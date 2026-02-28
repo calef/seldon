@@ -120,6 +120,8 @@ module Seldon
         end
       end
 
+      class RedirectError < StandardError; end
+
       def initialize(user_agent: UA, delay: DEFAULTS[:delay], max_redirects: DEFAULTS[:max_redirects],
                      timeout: nil, open_timeout: nil, read_timeout: nil,
                      max_retries: DEFAULTS[:max_retries],
@@ -212,7 +214,7 @@ module Seldon
         rescue URI::InvalidURIError => e
           logger.debug "Invalid URI for canonical resolution (#{url}): #{e.message}"
           return nil
-        rescue Faraday::Error, HttpError, NotFoundError => e
+        rescue Faraday::Error, HttpError, NotFoundError, RedirectError => e
           logger.debug "Failed to resolve canonical URL for #{url}: #{e.message}"
           return nil
         end
