@@ -212,7 +212,7 @@ module Seldon
         rescue URI::InvalidURIError => e
           logger.debug "Invalid URI for canonical resolution (#{url}): #{e.message}"
           return nil
-        rescue StandardError => e
+        rescue Faraday::Error, HttpError, NotFoundError => e
           logger.debug "Failed to resolve canonical URL for #{url}: #{e.message}"
           return nil
         end
