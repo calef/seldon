@@ -32,6 +32,10 @@ module HttpClientTestHelpers
       @headers = headers
       @body = body
     end
+
+    def [](key)
+      @headers[key]
+    end
   end
 
   class FakeResponseStream
@@ -39,8 +43,8 @@ module HttpClientTestHelpers
       @chunks = chunks
     end
 
-    def read_body
-      @chunks.each { |chunk| yield chunk }
+    def read_body(&)
+      @chunks.each(&)
     end
   end
 
