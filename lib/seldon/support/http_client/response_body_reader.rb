@@ -31,7 +31,7 @@ module Seldon
           content_type = response['Content-Type'] if response.respond_to?(:[])
           return Encoding::BINARY unless content_type
 
-          match = content_type.match(/charset=([^\s;]+)/i)
+          match = content_type.match(/charset="?([^\s";]+)"?/i)
           return Encoding::BINARY unless match
 
           Encoding.find(match[1])
