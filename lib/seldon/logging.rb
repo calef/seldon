@@ -113,13 +113,13 @@ module Seldon
 
   module Loggable
     def logger
-      return @logger if defined?(@logger) && @logger
+      return @seldon_logger if defined?(@seldon_logger) && @seldon_logger
 
       Seldon::Logging.logger
     end
 
     def logger=(new_logger)
-      @logger = new_logger
+      @seldon_logger = new_logger
     end
   end
 end
