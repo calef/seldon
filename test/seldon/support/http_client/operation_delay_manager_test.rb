@@ -171,6 +171,61 @@ module Seldon
           defaults = manager.send(:default_operation_host_delays)
           assert_equal({}, defaults)
         end
+
+        def test_concurrent_calls_to_same_host_respect_delay
+          delay = 0.05
+          manager = Seldon::Support::HttpClient::OperationDelayManager.new(
+            host_operation_delays: {
+              'test_op' => {
+                'example.com' => delay
+              }
+            }
+          )
+
+          # Prime the first call so subsequent calls must wait
+          manager.apply_delay('test_op', URI('https://example.com'))
+
+          start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          threads = 4.times.map do
+            Thread.new do
+              manager.apply_delay('test_op', URI('https://example.com'))
+            end
+          end
+          threads.each(&:join)
+          elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start_time
+
+          # 4 serialized calls should take at least 3x the delay
+          assert_operator elapsed, :>=, delay * 3,
+            "Expected serialized same-host calls to take >= #{delay * 3}s, got #{elapsed}s"
+        end
+
+        def test_concurrent_calls_to_different_hosts_do_not_block_each_other
+          delay = 0.05
+          manager = Seldon::Support::HttpClient::OperationDelayManager.new(
+            host_operation_delays: {
+              'test_op' => {
+                'host-a.com' => delay,
+                'host-b.com' => delay
+              }
+            }
+          )
+
+          # Prime both hosts so the next call to each must sleep
+          manager.apply_delay('test_op', URI('https://host-a.com'))
+          manager.apply_delay('test_op', URI('https://host-b.com'))
+
+          start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          threads = [
+            Thread.new { manager.apply_delay('test_op', URI('https://host-a.com')) },
+            Thread.new { manager.apply_delay('test_op', URI('https://host-b.com')) }
+          ]
+          threads.each(&:join)
+          elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start_time
+
+          # Both should run in parallel, so total time ~ 1x delay, not 2x
+          assert_operator elapsed, :<, delay * 2,
+            "Expected parallel different-host calls to complete in < #{delay * 2}s, got #{elapsed}s"
+        end
       end
     end
   end
