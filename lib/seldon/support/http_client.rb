@@ -4,6 +4,7 @@ require 'uri'
 require 'faraday'
 require 'faraday/typhoeus'
 require 'seldon/logging'
+require 'seldon/version'
 require_relative 'env_utils'
 require_relative 'url_utils'
 require_relative 'http_client/response_body_reader'
@@ -18,8 +19,7 @@ module Seldon
     class HttpClient
       include Seldon::Loggable
 
-      UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 13_0) AppleWebKit/537.36 ' \
-           '(KHTML, like Gecko) Chrome/125.0 Safari/537.36'
+      UA = "Seldon/#{Seldon::VERSION} (+https://github.com/calef/seldon)".freeze
       HTML_ACCEPT = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
 
       DEFAULTS = {
