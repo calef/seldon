@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require_relative '../env_utils'
-
 module Seldon
   module Support
     class HttpClient
@@ -38,14 +36,7 @@ module Seldon
         private
 
         def default_operation_host_delays
-          delay = Seldon::Support::EnvUtils.positive_float('RSS_PUBMED_CANONICAL_HEAD_DELAY', 1.0)
-          return {} unless delay
-
-          {
-            'canonical_head' => {
-              'pubmed.ncbi.nlm.nih.gov' => delay
-            }
-          }
+          {}
         end
 
         def normalize_operation_host_delays(config)

@@ -166,21 +166,10 @@ module Seldon
           end
         end
 
-        def test_default_operation_host_delays_includes_pubmed
-          # Temporarily set the environment variable
-          original_value = ENV['RSS_PUBMED_CANONICAL_HEAD_DELAY']
-          ENV['RSS_PUBMED_CANONICAL_HEAD_DELAY'] = '2.5'
-
+        def test_default_operation_host_delays_is_empty
           manager = Seldon::Support::HttpClient::OperationDelayManager.new(host_operation_delays: nil)
           defaults = manager.send(:default_operation_host_delays)
-          assert_equal 2.5, defaults.dig('canonical_head', 'pubmed.ncbi.nlm.nih.gov')
-        ensure
-          # Restore original value
-          if original_value
-            ENV['RSS_PUBMED_CANONICAL_HEAD_DELAY'] = original_value
-          else
-            ENV.delete('RSS_PUBMED_CANONICAL_HEAD_DELAY')
-          end
+          assert_equal({}, defaults)
         end
       end
     end
