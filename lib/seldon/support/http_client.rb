@@ -196,7 +196,7 @@ module Seldon
       end
 
       def resolve_final_url(url)
-        with_retries(url, return_on_exhaust: true) do
+        with_retries(url, return_on_exhaust: true, retry_log_level: :warn) do
           uri = URI.parse(url)
           result = @request_flow.resolve_head_redirects(uri, origin_url: url, operation: 'canonical_head')
           return unless result
@@ -262,7 +262,7 @@ module Seldon
       # should be handled inside the block.
       #
       # When return_on_exhaust is true, returns nil after max retries instead of raising.
-      def with_retries(url, return_on_exhaust: false)
+      def with_retries(url, return_on_exhaust: false, retry_log_level: :debug)
         attempt = 0
         max_attempts = @max_retries + 1
         begin
@@ -298,10 +298,9 @@ module Seldon
           end
 
           wait = apply_jitter(@retry_initial_delay * (@retry_backoff_factor**(attempt - 1)))
-          logger.debug(
-            "Retrying #{url} after #{e.class} (#{e.message}) in #{format('%.2f', wait)}s " \
-            "(attempt #{attempt}/#{max_attempts})"
-          )
+          logger.send(retry_log_level,
+                      "Retrying #{url} after #{e.class} (#{e.message}) in #{format('%.2f', wait)}s " \
+                      "(attempt #{attempt}/#{max_attempts})")
           sleep wait
           retry
         end
