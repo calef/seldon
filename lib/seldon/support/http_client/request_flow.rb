@@ -73,10 +73,10 @@ module Seldon
         end
 
         def follow_redirect(response, uri, accept, remaining_redirects, origin_url:, operation:)
-          raise 'Too many redirects' if remaining_redirects <= 0
+          raise RedirectError, 'Too many redirects' if remaining_redirects <= 0
 
           location = @response_processor.extract_redirect_location(response)
-          raise 'Redirect missing location header' unless location
+          raise RedirectError, 'Redirect missing location header' unless location
 
           new_url = Seldon::Support::UrlUtils.absolutize(uri.to_s, location) || location
           # Use the redirecting URL as the referer for the next request
@@ -97,7 +97,7 @@ module Seldon
           @response_processor.check_status!(response, uri, origin_url: origin_url, operation: operation) if status_code == 429
 
           if @response_processor.redirect?(response)
-            raise 'Too many redirects' if remaining_redirects <= 0
+            raise RedirectError, 'Too many redirects' if remaining_redirects <= 0
 
             location = @response_processor.extract_redirect_location(response)
             return { url: uri.to_s, status: status_code } unless location

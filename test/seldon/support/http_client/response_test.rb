@@ -185,12 +185,12 @@ module Seldon
           transport = Object.new
           transport.define_singleton_method(:execute_get) { |_uri, _accept, operation: nil, referer: nil, if_modified_since: nil, if_none_match: nil| response }
           request_flow = build_request_flow(transport, max_redirects: 1)
-          assert_raises(RuntimeError) do
+          assert_raises(Seldon::Support::HttpClient::RedirectError) do
             request_flow.send(:follow_redirect, response, URI('https://example.com'), 'text/html', 1, origin_url: 'origin', operation: 'op')
           end
 
           response = HttpClientTestHelpers::FakeResponse.new(301, { 'location' => 'https://example.com' })
-          assert_raises(RuntimeError) do
+          assert_raises(Seldon::Support::HttpClient::RedirectError) do
             request_flow.send(:follow_redirect, response, URI('https://example.com'), 'text/html', 0, origin_url: 'origin', operation: 'op')
           end
         end
@@ -243,7 +243,7 @@ module Seldon
           transport = Object.new
           transport.define_singleton_method(:execute_head) { |_uri, operation: nil| response }
           request_flow = build_request_flow(transport, max_redirects: 0)
-          assert_raises(RuntimeError) do
+          assert_raises(Seldon::Support::HttpClient::RedirectError) do
             request_flow.send(:follow_head_redirect, URI('https://example.com'), 0, origin_url: 'origin', operation: 'op')
           end
         end
