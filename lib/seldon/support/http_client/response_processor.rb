@@ -22,7 +22,7 @@ module Seldon
           @max_retry_after_delay = max_retry_after_delay
         end
 
-        def check_status?(response, uri, origin_url:, operation:)
+        def check_status!(response, uri, origin_url:, operation:)
           status_code = response.status.to_i
 
           raise_not_modified(uri, origin_url: origin_url, operation: operation) if status_code == 304

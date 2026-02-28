@@ -146,7 +146,7 @@ module Seldon
           response = HttpClientTestHelpers::FakeResponse.new(503, { 'retry-after' => '30' })
           processor = Seldon::Support::HttpClient::ResponseProcessor.new(service_unavailable_delay: 120)
           error = assert_raises(Seldon::Support::HttpClient::ServiceUnavailableError) do
-            processor.check_status?(response, URI('https://example.com'), origin_url: 'origin', operation: 'op')
+            processor.check_status!(response, URI('https://example.com'), origin_url: 'origin', operation: 'op')
           end
           assert_equal 30, error.retry_after
         end
@@ -155,7 +155,7 @@ module Seldon
           response = HttpClientTestHelpers::FakeResponse.new(503, {})
           processor = Seldon::Support::HttpClient::ResponseProcessor.new(service_unavailable_delay: 120)
           error = assert_raises(Seldon::Support::HttpClient::ServiceUnavailableError) do
-            processor.check_status?(response, URI('https://example.com'), origin_url: 'origin', operation: 'op')
+            processor.check_status!(response, URI('https://example.com'), origin_url: 'origin', operation: 'op')
           end
           assert_equal 120, error.retry_after
         end
