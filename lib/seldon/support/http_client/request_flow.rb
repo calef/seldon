@@ -39,7 +39,7 @@ module Seldon
                                                          if_modified_since:, if_none_match:) do |http_response|
             redirect = @response_processor.redirect?(http_response)
             unless redirect
-              @response_processor.check_status?(http_response, uri, origin_url: origin_url, operation: operation)
+              @response_processor.check_status!(http_response, uri, origin_url: origin_url, operation: operation)
               status_checked = true
               body = ResponseBodyReader.read(http_response)
             end
@@ -57,7 +57,7 @@ module Seldon
             )
           end
 
-          @response_processor.check_status?(response, uri, origin_url: origin_url, operation: operation) unless status_checked
+          @response_processor.check_status!(response, uri, origin_url: origin_url, operation: operation) unless status_checked
           body = ResponseBodyReader.read(response) if body.nil?
 
           [
@@ -94,7 +94,7 @@ module Seldon
           response = @transport.execute_head(uri, operation: operation)
           status_code = response&.status&.to_i
 
-          @response_processor.check_status?(response, uri, origin_url: origin_url, operation: operation) if status_code == 429
+          @response_processor.check_status!(response, uri, origin_url: origin_url, operation: operation) if status_code == 429
 
           if @response_processor.redirect?(response)
             raise 'Too many redirects' if remaining_redirects <= 0
