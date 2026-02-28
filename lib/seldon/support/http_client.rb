@@ -196,7 +196,7 @@ module Seldon
       end
 
       def resolve_final_url(url)
-        with_retries(url) do
+        with_retries(url, return_on_exhaust: true) do
           uri = URI.parse(url)
           result = @request_flow.resolve_head_redirects(uri, origin_url: url, operation: 'canonical_head')
           return unless result

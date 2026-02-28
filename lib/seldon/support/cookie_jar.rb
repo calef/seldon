@@ -230,6 +230,7 @@ module Seldon
         last_slash&.zero? ? '/' : path[0...last_slash]
       end
 
+      # Caller must hold @mutex
       def store(cookie)
         return unless cookie.domain
 
