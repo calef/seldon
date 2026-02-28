@@ -194,9 +194,9 @@ module Seldon
           threads.each(&:join)
           elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start_time
 
-          # 4 serialized calls should take at least 3x the delay
-          assert_operator elapsed, :>=, delay * 3,
-            "Expected serialized same-host calls to take >= #{delay * 3}s, got #{elapsed}s"
+          # 4 serialized calls after the prime should take at least 4x the delay
+          assert_operator elapsed, :>=, delay * 4 * 0.9,
+            "Expected serialized same-host calls to take >= #{delay * 4 * 0.9}s, got #{elapsed}s"
         end
 
         def test_concurrent_calls_to_different_hosts_do_not_block_each_other
