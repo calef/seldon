@@ -173,10 +173,8 @@ module Seldon
       end
 
       def fetch(url, accept:, referer: nil, if_modified_since: nil, if_none_match: nil)
-        attempt = 0
-        max_attempts = @max_retries + 1
-        begin
-          attempt += 1
+        payload = nil
+        with_retries(url) do
           _response, payload = @request_flow.fetch_with_redirects(
             url,
             accept,
@@ -190,42 +188,15 @@ module Seldon
         rescue NotModifiedError
           sleep @delay
           return { not_modified: true, final_url: url }
-        rescue ForbiddenError => e
+        rescue ForbiddenError
           logger.warn "Access forbidden (HTTP 403) for #{url}, not retrying"
           raise
-        rescue TooManyRequestsError => e
-          raise if attempt > @max_retries
-
-          wait = apply_jitter(e.retry_after || @too_many_requests_delay)
-          log_rate_limit_backoff(e, wait, status: 429, attempt: attempt, max_attempts: max_attempts)
-          sleep wait
-          retry
-        rescue ServiceUnavailableError => e
-          raise if attempt > @max_retries
-
-          wait = apply_jitter(e.retry_after || @service_unavailable_delay)
-          log_rate_limit_backoff(e, wait, status: 503, attempt: attempt, max_attempts: max_attempts)
-          sleep wait
-          retry
-        rescue *RETRYABLE_ERRORS => e
-          raise if attempt > @max_retries
-
-          wait = apply_jitter(@retry_initial_delay * (@retry_backoff_factor**(attempt - 1)))
-          logger.debug(
-            "Retrying #{url} after #{e.class} (#{e.message}) in #{format('%.2f', wait)}s " \
-            "(attempt #{attempt}/#{max_attempts})"
-          )
-          sleep wait
-          retry
         end
         payload
       end
 
       def resolve_final_url(url)
-        attempt = 0
-        max_attempts = @max_retries + 1
-        begin
-          attempt += 1
+        with_retries(url) do
           uri = URI.parse(url)
           result = @request_flow.resolve_head_redirects(uri, origin_url: url, operation: 'canonical_head')
           return unless result
@@ -235,47 +206,20 @@ module Seldon
 
           logger.debug "Skipping canonical redirect for #{url} due to status #{status}" if status
           nil
-        rescue ForbiddenError => e
+        rescue ForbiddenError
           logger.debug "Access forbidden (HTTP 403) for #{url}, not retrying"
-          nil
-        rescue TooManyRequestsError => e
-          raise if attempt > @max_retries
-
-          wait = apply_jitter(e.retry_after || @too_many_requests_delay)
-          log_rate_limit_backoff(e, wait, status: 429, attempt: attempt, max_attempts: max_attempts)
-          sleep wait
-          retry
-        rescue ServiceUnavailableError => e
-          raise if attempt > @max_retries
-
-          wait = apply_jitter(e.retry_after || @service_unavailable_delay)
-          log_rate_limit_backoff(e, wait, status: 503, attempt: attempt, max_attempts: max_attempts)
-          sleep wait
-          retry
-        rescue *RETRYABLE_ERRORS => e
-          raise if attempt > @max_retries
-
-          wait = apply_jitter(@retry_initial_delay * (@retry_backoff_factor**(attempt - 1)))
-          logger.warn(
-            "Retrying HEAD #{url} after #{e.class} (#{e.message}) in #{format('%.2f', wait)}s " \
-            "(attempt #{attempt}/#{max_attempts})"
-          )
-          sleep wait
-          retry
+          return nil
         rescue URI::InvalidURIError => e
           logger.debug "Invalid URI for canonical resolution (#{url}): #{e.message}"
-          nil
+          return nil
         rescue StandardError => e
           logger.debug "Failed to resolve canonical URL for #{url}: #{e.message}"
-          nil
+          return nil
         end
       end
 
       def response_for(url, accept: HTML_ACCEPT, referer: nil)
-        attempt = 0
-        max_attempts = @max_retries + 1
-        begin
-          attempt += 1
+        with_retries(url, return_on_exhaust: true) do
           response, payload = @request_flow.fetch_with_redirects(
             url,
             accept,
@@ -283,31 +227,52 @@ module Seldon
             operation: 'status_check',
             referer:
           )
-          {
+          return {
             status: response.status.to_i,
             final_url: payload[:final_url],
             response: response
           }
         rescue ForbiddenError => e
           logger.debug "Access forbidden (HTTP 403) for #{url}, not retrying"
-          {
+          return {
             status: 403,
             final_url: e.url || url,
             response: nil
           }
         rescue NotFoundError => e
-          {
+          return {
             status: e.status || 404,
             final_url: e.url || url,
             response: nil
           }
+        rescue URI::InvalidURIError => e
+          logger.debug "Invalid URI while checking status (#{url}): #{e.message}"
+          return nil
+        rescue StandardError => e
+          logger.debug "Failed to check status for #{url}: #{e.message}"
+          return nil
+        end
+      end
+
+      private
+
+      # Unified retry loop for all public methods.
+      # Handles TooManyRequestsError, ServiceUnavailableError, and RETRYABLE_ERRORS
+      # with exponential backoff and jitter. Non-retryable errors (ForbiddenError, etc.)
+      # should be handled inside the block.
+      #
+      # When return_on_exhaust is true, returns nil after max retries instead of raising.
+      def with_retries(url, return_on_exhaust: false)
+        attempt = 0
+        max_attempts = @max_retries + 1
+        begin
+          attempt += 1
+          yield
         rescue TooManyRequestsError => e
           if attempt > @max_retries
-            logger.warn(
-              "Status check failed for #{url} after #{max_attempts} attempts: " \
-              'HTTP 429 Too Many Requests'
-            )
-            return nil
+            return log_exhaustion(url, max_attempts, 'HTTP 429 Too Many Requests') if return_on_exhaust
+
+            raise
           end
 
           wait = apply_jitter(e.retry_after || @too_many_requests_delay)
@@ -316,11 +281,9 @@ module Seldon
           retry
         rescue ServiceUnavailableError => e
           if attempt > @max_retries
-            logger.warn(
-              "Status check failed for #{url} after #{max_attempts} attempts: " \
-              'HTTP 503 Service Unavailable'
-            )
-            return nil
+            return log_exhaustion(url, max_attempts, 'HTTP 503 Service Unavailable') if return_on_exhaust
+
+            raise
           end
 
           wait = apply_jitter(e.retry_after || @service_unavailable_delay)
@@ -329,11 +292,9 @@ module Seldon
           retry
         rescue *RETRYABLE_ERRORS => e
           if attempt > @max_retries
-            logger.warn(
-              "Status check failed for #{url} after #{max_attempts} attempts: " \
-              "#{e.class} (#{e.message})"
-            )
-            return nil
+            return log_exhaustion(url, max_attempts, "#{e.class} (#{e.message})") if return_on_exhaust
+
+            raise
           end
 
           wait = apply_jitter(@retry_initial_delay * (@retry_backoff_factor**(attempt - 1)))
@@ -343,22 +304,19 @@ module Seldon
           )
           sleep wait
           retry
-        rescue URI::InvalidURIError => e
-          logger.debug "Invalid URI while checking status (#{url}): #{e.message}"
-          nil
-        rescue StandardError => e
-          logger.debug "Failed to check status for #{url}: #{e.message}"
-          nil
         end
       end
-
-      private
 
       def apply_jitter(base_wait)
         return base_wait if @retry_jitter.nil? || @retry_jitter <= 0
 
         jitter_range = base_wait * @retry_jitter
-        base_wait + rand(-jitter_range..jitter_range)
+        [base_wait + rand(-jitter_range..jitter_range), 0].max
+      end
+
+      def log_exhaustion(url, max_attempts, reason)
+        logger.warn("Failed for #{url} after #{max_attempts} attempts: #{reason}")
+        nil
       end
 
       def log_rate_limit_backoff(error, wait, status:, attempt:, max_attempts:)

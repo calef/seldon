@@ -20,9 +20,7 @@ module Seldon
         ref_src
         ref_url
       ].freeze
-      HOST_TRACKING_PARAMS = {
-        'pubmed.ncbi.nlm.nih.gov' => %w[fc ff v].freeze
-      }.freeze
+      HOST_TRACKING_PARAMS = {}.freeze
 
       def normalize(link, base: nil)
         link_str = link.to_s.strip
