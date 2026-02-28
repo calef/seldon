@@ -1,5 +1,26 @@
 # Change Notes
 
+## [0.9.0] - 2026-02-28
+
+### Breaking Changes
+
+- Renamed `ResponseProcessor#check_status?` to `check_status!` to follow Ruby convention for methods that raise.
+- Replaced Chrome-impersonating User-Agent with transparent bot string `Seldon/VERSION (+https://github.com/calef/seldon)`. Callers can still override via the `user_agent:` parameter.
+- Removed PubMed-specific configuration from `OperationDelayManager` (hardcoded host delays and `RSS_PUBMED_CANONICAL_HEAD_DELAY` env var) and `UrlNormalizer` (host-specific tracking params). Consuming applications should provide their own host-specific config.
+- Introduced `RedirectError` class for redirect failures (previously raised bare `RuntimeError`).
+
+### Improvements
+
+- Consolidated duplicated retry/backoff logic across `fetch`, `resolve_final_url`, and `response_for` into a single `with_retries` method.
+- Added thread-safety to `CookieJar` with Mutex protection on all read/write operations.
+- Made `ResponseBodyReader` charset-aware: uses Content-Type charset when available instead of always forcing BINARY encoding.
+- Narrowed `rescue StandardError` in `resolve_final_url` to specific exception types (`Faraday::Error`, `HttpError`, `NotFoundError`, `RedirectError`) to avoid silently swallowing programming errors.
+- Renamed `@logger` instance variable in `Loggable` mixin to `@seldon_logger` to prevent name collisions with including classes.
+- Restored operation context in retry exhaustion log messages (e.g., `"status_check failed for ..."` instead of generic `"Failed for ..."`).
+- Restored `warn` log level for HEAD request retries in `resolve_final_url`.
+- Fixed `apply_jitter` to floor at zero, preventing negative wait times.
+- Added thread-safety tests for `OperationDelayManager`.
+
 ## [0.8.1] - 2026-02-14
 
 - Updated rubocop from 1.82.1 to 1.84.2
