@@ -8,7 +8,7 @@ module Seldon
     # Manages HTTP cookies for a session, handling storage, retrieval,
     # and Set-Cookie header parsing per RFC 6265.
     class CookieJar
-      Cookie = Struct.new(:name, :value, :domain, :path, :expires, :secure, :http_only, keyword_init: true)
+      Cookie = Struct.new(:name, :value, :domain, :path, :expires, :secure, :http_only)
 
       def initialize
         @cookies = {} # domain -> path -> name -> Cookie
