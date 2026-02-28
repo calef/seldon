@@ -174,7 +174,7 @@ module Seldon
 
       def fetch(url, accept:, referer: nil, if_modified_since: nil, if_none_match: nil)
         payload = nil
-        with_retries(url) do
+        with_retries(url, operation: 'content_fetch') do
           _response, payload = @request_flow.fetch_with_redirects(
             url,
             accept,
@@ -196,7 +196,7 @@ module Seldon
       end
 
       def resolve_final_url(url)
-        with_retries(url, return_on_exhaust: true, retry_log_level: :warn) do
+        with_retries(url, operation: 'canonical_head', return_on_exhaust: true, retry_log_level: :warn) do
           uri = URI.parse(url)
           result = @request_flow.resolve_head_redirects(uri, origin_url: url, operation: 'canonical_head')
           return unless result
@@ -219,7 +219,7 @@ module Seldon
       end
 
       def response_for(url, accept: HTML_ACCEPT, referer: nil)
-        with_retries(url, return_on_exhaust: true) do
+        with_retries(url, operation: 'status_check', return_on_exhaust: true) do
           response, payload = @request_flow.fetch_with_redirects(
             url,
             accept,
@@ -262,7 +262,7 @@ module Seldon
       # should be handled inside the block.
       #
       # When return_on_exhaust is true, returns nil after max retries instead of raising.
-      def with_retries(url, return_on_exhaust: false, retry_log_level: :debug)
+      def with_retries(url, operation: nil, return_on_exhaust: false, retry_log_level: :debug)
         attempt = 0
         max_attempts = @max_retries + 1
         begin
@@ -270,7 +270,7 @@ module Seldon
           yield
         rescue TooManyRequestsError => e
           if attempt > @max_retries
-            return log_exhaustion(url, max_attempts, 'HTTP 429 Too Many Requests') if return_on_exhaust
+            return log_exhaustion(url, max_attempts, 'HTTP 429 Too Many Requests', operation: operation) if return_on_exhaust
 
             raise
           end
@@ -281,7 +281,7 @@ module Seldon
           retry
         rescue ServiceUnavailableError => e
           if attempt > @max_retries
-            return log_exhaustion(url, max_attempts, 'HTTP 503 Service Unavailable') if return_on_exhaust
+            return log_exhaustion(url, max_attempts, 'HTTP 503 Service Unavailable', operation: operation) if return_on_exhaust
 
             raise
           end
@@ -292,7 +292,7 @@ module Seldon
           retry
         rescue *RETRYABLE_ERRORS => e
           if attempt > @max_retries
-            return log_exhaustion(url, max_attempts, "#{e.class} (#{e.message})") if return_on_exhaust
+            return log_exhaustion(url, max_attempts, "#{e.class} (#{e.message})", operation: operation) if return_on_exhaust
 
             raise
           end
@@ -313,8 +313,8 @@ module Seldon
         [base_wait + rand(-jitter_range..jitter_range), 0].max
       end
 
-      def log_exhaustion(url, max_attempts, reason)
-        logger.warn("Failed for #{url} after #{max_attempts} attempts: #{reason}")
+      def log_exhaustion(url, max_attempts, reason, operation: nil)
+        logger.warn("#{operation || 'unknown'} failed for #{url} after #{max_attempts} attempts: #{reason}")
         nil
       end
 
