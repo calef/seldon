@@ -16,11 +16,11 @@ Gem::Specification.new do |spec|
   spec.files = Dir.glob('lib/**/*.rb') + %w[README.md LICENSE]
   spec.require_paths = ['lib']
 
-  spec.add_dependency 'faraday'
-  spec.add_dependency 'faraday-typhoeus'
-  spec.add_development_dependency 'minitest'
-  spec.add_development_dependency 'rubocop'
-  spec.add_development_dependency 'rubocop-minitest'
-  spec.add_development_dependency 'rake'
-  spec.add_development_dependency 'simplecov'
+  spec.add_dependency 'faraday', '~> 2.0'
+  spec.add_dependency 'faraday-typhoeus', '~> 1.0'
+  spec.add_development_dependency 'minitest', '~> 6.0'
+  spec.add_development_dependency 'rubocop', '~> 1.0'
+  spec.add_development_dependency 'rubocop-minitest', '~> 0.35'
+  spec.add_development_dependency 'rake', '~> 13.0'
+  spec.add_development_dependency 'simplecov', '~> 0.22'
 end
