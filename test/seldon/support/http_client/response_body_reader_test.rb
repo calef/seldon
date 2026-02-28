@@ -23,7 +23,8 @@ module Seldon
           response = HttpClientTestHelpers::FakeResponse.new(200, {}, body: 'Hello €50')
           body = Seldon::Support::HttpClient::ResponseBodyReader.read(response)
 
-          expected = "Hello €50".dup.force_encoding('BINARY')
+          expected = 'Hello €50'.dup.force_encoding('BINARY')
+
           assert_equal expected, body
           assert_equal Encoding::BINARY, body.encoding
         end
@@ -49,6 +50,44 @@ module Seldon
 
           assert_equal '', body
           assert_equal Encoding::BINARY, body.encoding
+        end
+
+        def test_read_uses_utf8_when_charset_specified
+          response = HttpClientTestHelpers::FakeResponse.new(
+            200, { 'Content-Type' => 'text/html; charset=utf-8' }, body: 'Hello'
+          )
+          body = Seldon::Support::HttpClient::ResponseBodyReader.read(response)
+
+          assert_equal 'Hello', body
+          assert_equal Encoding::UTF_8, body.encoding
+        end
+
+        def test_read_uses_binary_when_no_content_type
+          response = HttpClientTestHelpers::FakeResponse.new(200, {}, body: 'Hello')
+          body = Seldon::Support::HttpClient::ResponseBodyReader.read(response)
+
+          assert_equal 'Hello', body
+          assert_equal Encoding::BINARY, body.encoding
+        end
+
+        def test_read_uses_binary_for_unknown_charset
+          response = HttpClientTestHelpers::FakeResponse.new(
+            200, { 'Content-Type' => 'text/html; charset=made-up-encoding' }, body: 'Hello'
+          )
+          body = Seldon::Support::HttpClient::ResponseBodyReader.read(response)
+
+          assert_equal 'Hello', body
+          assert_equal Encoding::BINARY, body.encoding
+        end
+
+        def test_read_uses_iso_8859_1_when_charset_specified
+          response = HttpClientTestHelpers::FakeResponse.new(
+            200, { 'Content-Type' => 'text/html; charset=iso-8859-1' }, body: 'Hello'
+          )
+          body = Seldon::Support::HttpClient::ResponseBodyReader.read(response)
+
+          assert_equal 'Hello', body
+          assert_equal Encoding::ISO_8859_1, body.encoding
         end
       end
     end
